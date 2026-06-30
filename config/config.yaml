@@ -1,0 +1,20 @@
+# Optional config override for idrfeat. These values mirror the baked-in defaults in
+# idrfeat.io.DEFAULT_CONFIG. Pass this file with `idrfeat features --config config/config.yaml`
+# to change any of them. Anything left out keeps its default.
+
+seed: 1729
+
+disorder:
+  primary: metapredict          # segment caller; falls back to the heuristic if metapredict is absent
+  definitions: [metapredict, aiupred]  # which predictors to also compute columns for, when installed
+  score_threshold: 0.5          # per-residue disorder cutoff for calling segments
+  min_segment_length: 10        # shortest IDR segment to keep
+  plddt_threshold: 70.0         # AlphaFold confidence cutoff for the structure check
+  binding_threshold: 0.5        # AIUPred binding cutoff for the fold-on-binding fraction
+
+kmer:
+  ks: [1, 2, 3]                 # k values for k-mer content summaries
+
+lowcomplexity:
+  window: 12                    # sliding window for the low-complexity entropy rule
+  entropy_bits: 2.0             # windows below this residue entropy are flagged low complexity

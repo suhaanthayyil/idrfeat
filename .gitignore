@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Data and outputs (regenerate with scripts/fetch_databases.py)
+data/raw/
+data/interim/
+data/processed/
+*.parquet
+*.csv
+
+# OS
+.DS_Store
+
+# Internal draft correspondence, kept local (not for the public repo)
+email_to_carter.txt
