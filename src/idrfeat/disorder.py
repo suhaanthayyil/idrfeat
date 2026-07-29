@@ -12,10 +12,20 @@ from __future__ import annotations
 
 import numpy as np
 
-from .constants import AROMATIC, DISORDER_PROMOTING, KD_NORM
+from .constants import AA, AROMATIC, DISORDER_PROMOTING, KD_NORM
 
 _HEURISTIC_WINDOW = 11
 _predictor = None
+
+_STANDARD = set(AA)
+_TRANS = {ord(k): v for k, v in {"U": "C", "O": "K", "B": "D", "Z": "E", "J": "L", "X": "A"}.items()}
+
+
+def standardize_sequence(seq: str) -> str:
+    s = seq.upper().translate(_TRANS)
+    if all(c in _STANDARD for c in s):
+        return s
+    return "".join(c if c in _STANDARD else "A" for c in s)
 
 
 def segments_from_scores(
@@ -46,7 +56,7 @@ def metapredict_scores(seq: str) -> np.ndarray:
     """Per-residue metapredict disorder scores in [0, 1] for one sequence."""
     import metapredict as meta
 
-    return np.asarray(meta.predict_disorder(seq, return_numpy=True), dtype=float)
+    return np.asarray(meta.predict_disorder(standardize_sequence(seq), return_numpy=True), dtype=float)
 
 
 def _get_predictor():
@@ -60,12 +70,12 @@ def _get_predictor():
 
 def aiupred_disorder_scores(seq: str) -> np.ndarray:
     """AIUPred per-residue disorder propensity in [0, 1]."""
-    return np.asarray(_get_predictor().predict_disorder(seq), dtype=float)
+    return np.asarray(_get_predictor().predict_disorder(standardize_sequence(seq)), dtype=float)
 
 
 def aiupred_binding_scores(seq: str) -> np.ndarray:
     """AIUPred per-residue binding (fold-on-binding) propensity in [0, 1]."""
-    return np.asarray(_get_predictor().predict_binding(seq), dtype=float)
+    return np.asarray(_get_predictor().predict_binding(standardize_sequence(seq)), dtype=float)
 
 
 def _raw_propensity(residue: str) -> float:
