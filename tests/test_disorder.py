@@ -10,6 +10,7 @@ from idrfeat.disorder import (
     heuristic_disorder_scores,
     primary_disorder,
     segments_from_scores,
+    standardize_sequence,
 )
 
 
@@ -49,3 +50,20 @@ def test_default_backend_and_heuristic_dispatch() -> None:
     scores, name = primary_disorder("SEKPGSEKPGSEKPG", backend="heuristic")
     assert name == "heuristic"
     assert scores.shape == (15,)
+
+
+def test_standardize_preserves_length_and_maps_nonstandard() -> None:
+    seq = "MUOXBZJ"
+    out = standardize_sequence(seq)
+    assert len(out) == len(seq)
+    assert set(out) <= set("ACDEFGHIKLMNPQRSTVWY")
+    assert out == "MCKADEL"
+
+
+def test_metapredict_handles_selenocysteine() -> None:
+    from idrfeat.disorder import metapredict_available, metapredict_scores
+
+    if not metapredict_available():
+        return
+    scores = metapredict_scores("MKTAYIAKQRUQISFVKSHFSRQLEERLGLIEVQ")
+    assert len(scores) == 34
