@@ -27,7 +27,10 @@ predictors = [
 ]
 binding = ["aiupred @ git+https://github.com/doszilab/AIUPred"]
 conservation = ["pyBigWig>=0.3.22,<0.4"]
-dev = ["pytest>=8,<9", "ruff>=0.5,<1", "black>=24,<26"]
+modeling = ["scikit-learn>=1.4,<2"]
+interpret = ["shap>=0.44,<1"]
+esm = ["fair-esm>=2,<3", "torch>=2,<3"]
+dev = ["pytest>=8,<9", "ruff>=0.5,<1", "black>=24,<26", "scikit-learn>=1.4,<2"]
 
 [project.scripts]
 idrfeat = "idrfeat.cli:main"

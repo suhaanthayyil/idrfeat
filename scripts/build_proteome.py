@@ -5,7 +5,13 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from idrfeat.features import build_feature_table
+from idrfeat.annotations import (
+    load_dbptm,
+    load_drllps,
+    load_elm,
+    load_phasepro,
+)
+from idrfeat.features import Annotations, build_feature_table
 from idrfeat.io import load_config, read_fasta, write_table
 
 STREAM_URL = (
@@ -35,6 +41,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config")
     parser.add_argument("--backend", choices=["metapredict", "aiupred", "heuristic"])
     parser.add_argument("--limit", type=int, help="cap number of proteins for a smoke run")
+    parser.add_argument("--elm", help="ELM instances TSV")
+    parser.add_argument("--dbptm", nargs="+", help="one or more dbPTM files")
+    parser.add_argument("--phasepro", help="PhaSePro full JSON")
+    parser.add_argument("--drllps", help="DrLLPS LLPS protein table")
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     if args.fasta:
@@ -55,7 +65,13 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config(args.config)
     if args.backend:
         cfg["disorder"]["primary"] = args.backend
-    df = build_feature_table(seqs, cfg)
+    annotations = Annotations(
+        elm=load_elm(args.elm) if args.elm else None,
+        ptm=load_dbptm(args.dbptm) if args.dbptm else None,
+        phasepro=load_phasepro(args.phasepro) if args.phasepro else None,
+        drllps=load_drllps(args.drllps) if args.drllps else None,
+    )
+    df = build_feature_table(seqs, cfg, annotations=annotations)
     parquet_path, csv_path = write_table(df, args.out)
     print(f"{len(df)} IDR segments from {len(seqs)} proteins")
     print(f"wrote {parquet_path} and {csv_path}")
