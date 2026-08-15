@@ -24,10 +24,17 @@ DEFAULT_COLS = {
 }
 
 
+def _read_any(path: Path):
+    if path.suffix == ".parquet":
+        return pd.read_parquet(path)
+    sep = "\t" if path.suffix in {".txt", ".tsv"} else ","
+    return pd.read_csv(path, sep=sep)
+
+
 def load_residue_table(path: str | Path, cols: dict[str, str] | None = None) -> pd.DataFrame:
     mapping = {**DEFAULT_COLS, **(cols or {})}
     path = Path(path)
-    raw = pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
+    raw = _read_any(path)
     out = pd.DataFrame(
         {
             "accession": raw[mapping["accession"]].astype(str),

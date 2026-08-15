@@ -93,3 +93,24 @@ def test_aggregate_below_min_coverage_is_nan() -> None:
     seg = idr_segments_from_residues(df)
     out = aggregate_segment_labels(df, seg, min_covered=10).iloc[0]
     assert math.isnan(out["fitness_label"])
+
+
+def test_load_residue_table_tab_delimited_txt(tmp_path) -> None:
+    raw = pd.DataFrame(
+        {
+            "Uniprot_ID": ["P1", "P1"],
+            "AA_loc": [1, 2],
+            "AA": ["M", "A"],
+            "IDR": [0, 1],
+            "Fitness_depleted": [0, 1],
+            "LFC": [np.nan, -1.0],
+            "P_value": [np.nan, 0.01],
+            "Peptide_count": [0, 3],
+        }
+    )
+    path = tmp_path / "screen.txt"
+    raw.to_csv(path, sep="\t", index=False)
+    df = load_residue_table(path)
+    assert len(df) == 2
+    assert df["accession"].tolist() == ["P1", "P1"]
+    assert df["idr"].tolist() == [0, 1]
