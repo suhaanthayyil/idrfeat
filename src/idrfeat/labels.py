@@ -1,4 +1,4 @@
-"""Loader and IDR aggregation for the a functional screen per-residue fitness screen.
+"""Loader and IDR aggregation for a per-residue protein fitness screen.
 
 Expected per-residue columns (names configurable): Uniprot_ID, AA_loc, AA, IDR,
 Fitness_depleted, LFC, P_value, Peptide_count. IDR is UniProt-derived. Residues with

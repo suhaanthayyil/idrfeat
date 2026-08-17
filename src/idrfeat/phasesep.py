@@ -1,7 +1,6 @@
 """Sequence-based phase-separation features and curated-database membership.
 
-These answer the question on quantifying phase-separation propensity from sequence. The
-charge-times-aromatic proxy is the literal product she guessed. ``llps_seq_score`` is a
+These quantify phase-separation propensity from sequence. ``llps_seq_score`` is a
 transparent composite of the compositional signals most often linked to liquid-liquid phase
 separation: aromatics, arginine, glycine, glutamine and asparagine, charge, and low complexity.
 It is a heuristic, not a trained predictor; its value on the fitness labels is for phase 1 to

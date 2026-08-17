@@ -2,8 +2,8 @@
 
 `idrfeat` annotates intrinsically disordered regions (IDRs) in proteins and computes a wide
 feature row for every IDR segment. It is the feature-extraction layer for a project on whether
-missense variants perturb IDR function, anchored on protein fitness labels from the
-a functional screen. The features cover amino acid composition, charge and its patterning, hydropathy,
+missense variants perturb IDR function, using labels from a per-residue protein fitness screen.
+The features cover amino acid composition, charge and its patterning, hydropathy,
 k-mer content, low complexity, disorder and fold-on-binding propensity, short linear motifs,
 PTM sites, and phase-separation signals.
 
