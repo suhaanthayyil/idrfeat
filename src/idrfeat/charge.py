@@ -1,11 +1,13 @@
 """Charge content and charge-patterning features for an IDR segment.
 
-kappa follows Das and Pappu (2013): the deviation of the local charge asymmetry from the
-whole-sequence value over sliding windows of size 5 and 6, normalized by the same quantity
-for the maximally segregated sequence of identical composition. It is -1 when undefined,
-matching localCIDER, which happens when the sequence carries fewer than two charge signs.
-scd is the sequence charge decoration of Sawle and Ghosh (2015); it grows more negative as
-like charges cluster and opposite charges separate.
+kappa follows Das and Pappu (2013): for each window size (5 and 6) the deviation of the local
+charge asymmetry from the whole-sequence value is normalized by the same quantity for the
+maximally segregated sequence of identical composition, and the two per-window ratios are
+averaged. This matches the localCIDER reference implementation (Holehouse et al., 2017); the
+equivalence is locked by a test. kappa is -1 when undefined, which happens when the sequence
+carries fewer than two charge signs. scd is the sequence charge decoration of Sawle and Ghosh
+(2015); it grows more negative as like charges cluster and opposite charges separate, and it
+also matches localCIDER exactly.
 """
 
 from __future__ import annotations
@@ -37,42 +39,23 @@ def charge_features(seq: str) -> dict[str, float]:
     }
 
 
-def _sigma(npos: int, nneg: int, n: int) -> float:
-    fcr = (npos + nneg) / n
-    if fcr == 0.0:
-        return 0.0
-    ncpr = (npos - nneg) / n
-    return ncpr * ncpr / fcr
-
-
-def _delta(charges: list[int]) -> float:
-    n = len(charges)
-    sig_seq = _sigma(charges.count(1), charges.count(-1), n)
-    accum = []
-    for g in _WINDOWS:
-        if g > n:
-            continue
-        total = 0.0
-        windows = 0
-        for i in range(n - g + 1):
-            window = charges[i : i + g]
-            total += (_sigma(window.count(1), window.count(-1), g) - sig_seq) ** 2
-            windows += 1
-        accum.append(total / windows)
-    return sum(accum) / len(accum) if accum else 0.0
-
-
 def kappa(seq: str) -> float:
+    """Charge patterning from the localCIDER reference (Holehouse et al., 2017).
+
+    Returns -1 when kappa is undefined (fewer than two charge signs, or too short), matching
+    localCIDER. Returns NaN only when localCIDER is not installed, so the column records that
+    the source was absent rather than reporting a wrong value.
+    """
     charges = charge_vector(seq)
-    npos, nneg = charges.count(1), charges.count(-1)
-    nzero = len(charges) - npos - nneg
-    if npos == 0 or nneg == 0 or len(charges) < min(_WINDOWS):
+    if charges.count(1) == 0 or charges.count(-1) == 0 or len(charges) < min(_WINDOWS):
         return -1.0
-    segregated = [1] * npos + [0] * nzero + [-1] * nneg
-    delta_max = _delta(segregated)
-    if delta_max == 0.0:
-        return -1.0
-    return _delta(charges) / delta_max
+    try:
+        from localcider.sequenceParameters import SequenceParameters
+
+        from .disorder import standardize_sequence
+    except ImportError:
+        return float("nan")
+    return float(SequenceParameters(standardize_sequence(seq)).get_kappa())
 
 
 def scd(seq: str) -> float:

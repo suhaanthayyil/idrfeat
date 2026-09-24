@@ -50,3 +50,21 @@ def test_empty_sequence_is_safe() -> None:
     assert feats["net_charge"] == 0
     assert kappa("") == -1.0
     assert scd("") == 0.0
+
+
+def test_charge_features_match_localcider() -> None:
+    import pytest
+
+    pytest.importorskip("localcider")
+    from localcider.sequenceParameters import SequenceParameters
+
+    from idrfeat.disorder import standardize_sequence
+
+    seqs = ["MSKGEEDNMAIIKEFMRFKVHMEGSVNGHEFEIEGEGEGRPYEG", "GSDKDEKKPKARKEKKPRGRPRKDS", "AAKKRRDDEEGGSSPP"]
+    for s in seqs:
+        sp = SequenceParameters(standardize_sequence(s))
+        feats = charge_features(s)
+        assert math.isclose(feats["kappa"], sp.get_kappa(), abs_tol=1e-6)
+        assert math.isclose(feats["scd"], sp.get_SCD(), abs_tol=1e-6)
+        assert math.isclose(feats["fcr"], sp.get_FCR(), abs_tol=1e-6)
+        assert math.isclose(feats["ncpr"], sp.get_NCPR(), abs_tol=1e-6)
