@@ -35,3 +35,9 @@ docs/notebooklm-brief.md
 docs/project.md
 docs/features.md
 docs/project_recipe.docx
+email_progress_ask.txt
+docs/ISEF_project_plan.docx
+docs/idrfeat_progress_deck.pptx
+
+# catch every local email draft regardless of name
+email_*.txt
