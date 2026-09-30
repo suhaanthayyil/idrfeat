@@ -13,17 +13,20 @@ from .annotations import (
     load_phasepro,
     load_plddt_dir,
 )
+from .complexity import seg_masks, segmasker_available
 from .features import Annotations, build_feature_table
 from .io import load_config, read_fasta, write_table
 
 
-def _build_annotations(args: argparse.Namespace, accessions: list[str]) -> Annotations:
+def _build_annotations(args: argparse.Namespace, seqs: dict[str, str]) -> Annotations:
+    accessions = list(seqs)
     return Annotations(
         elm=load_elm(args.elm) if args.elm else None,
         ptm=load_dbptm(args.dbptm) if args.dbptm else None,
         phasepro=load_phasepro(args.phasepro) if args.phasepro else None,
         drllps=load_drllps(args.drllps) if args.drllps else None,
         plddt=load_plddt_dir(args.plddt_dir, accessions) if args.plddt_dir else None,
+        lowcomplexity=seg_masks(seqs) if segmasker_available() else None,
     )
 
 
@@ -35,7 +38,7 @@ def _cmd_features(args: argparse.Namespace) -> int:
     if not seqs:
         print(f"no sequences found in {args.fasta}", file=sys.stderr)
         return 1
-    annotations = _build_annotations(args, list(seqs))
+    annotations = _build_annotations(args, seqs)
     df = build_feature_table(seqs, cfg, annotations=annotations)
     parquet_path, csv_path = write_table(df, args.out)
     active = [
@@ -46,6 +49,7 @@ def _cmd_features(args: argparse.Namespace) -> int:
             ("phasepro", annotations.phasepro),
             ("drllps", annotations.drllps),
             ("plddt", annotations.plddt),
+            ("lowcomplexity(SEG)", annotations.lowcomplexity),
         ]
         if value
     ]
@@ -69,8 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
     feats.add_argument("--config", help="optional YAML config overriding the defaults")
     feats.add_argument(
         "--backend",
-        choices=["metapredict", "aiupred", "heuristic"],
-        help="disorder backend that defines IDR segments (default: metapredict if installed)",
+        choices=["metapredict", "aiupred"],
+        help="disorder backend that defines IDR segments (default: metapredict)",
     )
     feats.add_argument("--elm", help="ELM instances TSV")
     feats.add_argument("--dbptm", nargs="+", help="one or more dbPTM files")

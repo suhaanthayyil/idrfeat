@@ -1,13 +1,13 @@
-"""Tests for disorder segment calling and the native fallback backend."""
+"""Tests for disorder segment calling."""
 
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from idrfeat.disorder import (
     default_backend,
     disordered,
-    heuristic_disorder_scores,
     primary_disorder,
     segments_from_scores,
     standardize_sequence,
@@ -30,26 +30,13 @@ def test_disordered_mask() -> None:
     assert list(disordered(scores, threshold=0.5)) == [False, True, True]
 
 
-def test_heuristic_scores_shape_and_range() -> None:
-    seq = "MEEPQSDPSVEPPLSQETFSDLWKLLPEN"
-    scores = heuristic_disorder_scores(seq)
-    assert scores.shape == (len(seq),)
-    assert scores.min() >= 0.0 and scores.max() <= 1.0
-    # Deterministic.
-    assert np.array_equal(scores, heuristic_disorder_scores(seq))
+def test_default_backend_is_metapredict() -> None:
+    assert default_backend() == "metapredict"
 
 
-def test_heuristic_disordered_higher_than_ordered() -> None:
-    disordered_like = heuristic_disorder_scores("SEKPGSEKPGSEKPGSEKPG").mean()
-    ordered_like = heuristic_disorder_scores("WFWFWFWFWFWFWFWFWFWF").mean()
-    assert disordered_like > ordered_like
-
-
-def test_default_backend_and_heuristic_dispatch() -> None:
-    assert default_backend() in {"metapredict", "heuristic"}
-    scores, name = primary_disorder("SEKPGSEKPGSEKPG", backend="heuristic")
-    assert name == "heuristic"
-    assert scores.shape == (15,)
+def test_unknown_backend_raises() -> None:
+    with pytest.raises(ValueError):
+        primary_disorder("SEKPGSEKPG", backend="heuristic")
 
 
 def test_standardize_preserves_length_and_maps_nonstandard() -> None:

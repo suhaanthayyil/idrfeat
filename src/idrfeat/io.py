@@ -19,15 +19,13 @@ import yaml
 DEFAULT_CONFIG = {
     "seed": 1729,
     "disorder": {
-        "primary": "metapredict",  # falls back to the heuristic when metapredict is absent
+        "primary": "metapredict",  # required disorder predictor that defines IDR segments
         "definitions": ["metapredict", "aiupred"],
         "score_threshold": 0.5,
         "min_segment_length": 10,
         "plddt_threshold": 70.0,
         "binding_threshold": 0.5,
     },
-    "kmer": {"ks": [1, 2, 3]},
-    "lowcomplexity": {"window": 12, "entropy_bits": 2.0},
 }
 
 

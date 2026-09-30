@@ -1,71 +1,49 @@
-"""Amino acid composition and hydropathy features for an IDR segment.
+"""Amino acid composition and hydropathy features from localCIDER.
 
-All functions take a single amino acid string and return plain floats, so they work with no
-external dependencies. Non-standard characters (X, U, gaps) are counted in the length but
-contribute to no group, which matches how the downstream scales treat them.
+Amino acid fractions, grouped fractions, the fraction of disorder-promoting residues, and mean
+hydropathy are all read from localCIDER's SequenceParameters (Holehouse et al., 2017). Mean
+hydropathy is on localCIDER's normalized Kyte-Doolittle scale (0 to 9). Grouped fractions that
+localCIDER does not expose directly (aromatic, polar) are summed from its own amino acid
+fractions, so every number still traces to a single localCIDER computation.
 """
 
 from __future__ import annotations
 
-import math
-from collections import Counter
-
-from .constants import (
-    AA,
-    AROMATIC,
-    CHARGED,
-    DISORDER_PROMOTING,
-    GLYCINE,
-    KD_NORM,
-    POLAR,
-    PROLINE,
-)
+from .constants import AA, AROMATIC, POLAR
+from .physchem import params
 
 
-def aa_fractions(seq: str) -> dict[str, float]:
-    """Fraction of each of the 20 standard amino acids, keyed by single letter."""
-    n = len(seq)
-    counts = Counter(seq)
-    return {aa: (counts.get(aa, 0) / n if n else 0.0) for aa in AA}
-
-
-def _group_fraction(seq: str, group: frozenset[str]) -> float:
-    n = len(seq)
-    if not n:
-        return 0.0
-    return sum(1 for c in seq if c in group) / n
+def _empty_composition() -> dict[str, float]:
+    feats = {f"aa_frac_{aa}": 0.0 for aa in AA}
+    feats.update(
+        frac_charged=0.0,
+        frac_polar=0.0,
+        frac_aromatic=0.0,
+        frac_proline=0.0,
+        frac_glycine=0.0,
+        frac_disorder_promoting=0.0,
+    )
+    return feats
 
 
 def composition_features(seq: str) -> dict[str, float]:
-    """Per-residue fractions plus grouped fractions used as IDR composition features."""
-    feats = {f"aa_frac_{aa}": frac for aa, frac in aa_fractions(seq).items()}
-    feats["frac_charged"] = _group_fraction(seq, CHARGED)
-    feats["frac_polar"] = _group_fraction(seq, POLAR)
-    feats["frac_aromatic"] = _group_fraction(seq, AROMATIC)
-    feats["frac_proline"] = _group_fraction(seq, PROLINE)
-    feats["frac_glycine"] = _group_fraction(seq, GLYCINE)
-    feats["frac_disorder_promoting"] = _group_fraction(seq, DISORDER_PROMOTING)
+    """Per-residue and grouped composition fractions, all from localCIDER."""
+    if not seq:
+        return _empty_composition()
+    sp = params(seq)
+    fractions = sp.get_amino_acid_fractions()
+    feats = {f"aa_frac_{aa}": float(fractions.get(aa, 0.0)) for aa in AA}
+    feats["frac_charged"] = float(sp.get_FCR())
+    feats["frac_polar"] = sum(float(fractions.get(aa, 0.0)) for aa in POLAR)
+    feats["frac_aromatic"] = sum(float(fractions.get(aa, 0.0)) for aa in AROMATIC)
+    feats["frac_proline"] = float(fractions.get("P", 0.0))
+    feats["frac_glycine"] = float(fractions.get("G", 0.0))
+    feats["frac_disorder_promoting"] = float(sp.get_fraction_disorder_promoting())
     return feats
 
 
 def mean_hydropathy(seq: str) -> float:
-    """Mean normalized Kyte-Doolittle hydropathy in [0, 1] over scored residues."""
-    vals = [KD_NORM[c] for c in seq if c in KD_NORM]
-    return sum(vals) / len(vals) if vals else 0.0
-
-
-def hydropathy_patterning(seq: str) -> float:
-    """Blockiness of hydropathy along the segment.
-
-    An SCD-style decoration computed on mean-centered normalized hydropathy: more negative
-    when high- and low-hydropathy residues segregate into blocks, near zero when they are
-    evenly interspersed or the sequence has uniform hydropathy.
-    """
-    vals = [KD_NORM[c] for c in seq if c in KD_NORM]
-    n = len(vals)
-    if n < 2:
+    """localCIDER mean normalized Kyte-Doolittle hydropathy (0 to 9)."""
+    if not seq:
         return 0.0
-    mean = sum(vals) / n
-    h = [v - mean for v in vals]
-    total = sum(h[m] * h[k] * math.sqrt(m - k) for m in range(1, n) for k in range(m))
-    return total / n
+    return float(params(seq).get_mean_hydropathy())

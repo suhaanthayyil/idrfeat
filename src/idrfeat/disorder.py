@@ -1,20 +1,17 @@
 """Per-residue disorder annotation and IDR segment calling.
 
 metapredict is the primary predictor and AIUPred the secondary one; AIUPred also supplies the
-fold-on-binding propensity. Both are optional. When metapredict is not installed, segments are
-called with ``heuristic_disorder_scores``, a transparent hydropathy-and-charge stand-in that
-exists only so the pipeline runs offline. It is not a substitute for metapredict, and the
-backend that defined each segment is recorded in the output. AIUPred models, when used, load
-once into a process-level singleton.
+fold-on-binding propensity. Both are established published tools. metapredict is required, since
+IDR segments are defined by a real disorder predictor rather than a local stand-in. AIUPred
+models, when used, load once into a process-level singleton.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from .constants import AA, AROMATIC, DISORDER_PROMOTING, KD_NORM
+from .constants import AA
 
-_HEURISTIC_WINDOW = 11
 _predictor = None
 
 _STANDARD = set(AA)
@@ -78,30 +75,6 @@ def aiupred_binding_scores(seq: str) -> np.ndarray:
     return np.asarray(_get_predictor().predict_binding(standardize_sequence(seq)), dtype=float)
 
 
-def _raw_propensity(residue: str) -> float:
-    base = 1.0 - KD_NORM.get(residue, 0.5)
-    if residue in DISORDER_PROMOTING:
-        base += 0.2
-    if residue in AROMATIC:
-        base -= 0.2
-    return min(1.0, max(0.0, base))
-
-
-def heuristic_disorder_scores(seq: str) -> np.ndarray:
-    """Deterministic fallback disorder score in [0, 1], window-smoothed.
-
-    Hydrophilic, charged, and disorder-promoting residues score high; hydrophobic and aromatic
-    residues score low. A stand-in for metapredict when it is not installed, not a replacement.
-    """
-    if not seq:
-        return np.zeros(0, dtype=float)
-    raw = np.array([_raw_propensity(c) for c in seq], dtype=float)
-    half = _HEURISTIC_WINDOW // 2
-    padded = np.pad(raw, half, mode="edge")
-    kernel = np.ones(2 * half + 1) / (2 * half + 1)
-    return np.convolve(padded, kernel, mode="valid")
-
-
 def metapredict_available() -> bool:
     import importlib.util
 
@@ -115,8 +88,8 @@ def aiupred_available() -> bool:
 
 
 def default_backend() -> str:
-    """Primary disorder backend: metapredict when installed, else the heuristic."""
-    return "metapredict" if metapredict_available() else "heuristic"
+    """Primary disorder backend that defines IDR segments."""
+    return "metapredict"
 
 
 def primary_disorder(seq: str, backend: str | None = None) -> tuple[np.ndarray, str]:
@@ -126,6 +99,4 @@ def primary_disorder(seq: str, backend: str | None = None) -> tuple[np.ndarray, 
         return metapredict_scores(seq), backend
     if backend == "aiupred":
         return aiupred_disorder_scores(seq), backend
-    if backend == "heuristic":
-        return heuristic_disorder_scores(seq), backend
     raise ValueError(f"unknown disorder backend: {backend}")

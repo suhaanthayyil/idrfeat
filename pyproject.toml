@@ -16,11 +16,13 @@ dependencies = [
     "pyarrow>=15,<22",
     "pyyaml>=6,<7",
     "localcider>=0.1.21,<0.2",
+    "metapredict>=3,<4",
 ]
 
-# Optional, heavier scientific tools. The core library computes every sequence-based
-# feature without these. Annotation, disorder-predictor, and conservation features turn
-# on when the matching extra is installed and its database or model is available.
+# Optional, heavier scientific tools. The core library computes composition, charge, and
+# disorder features from localCIDER and metapredict. Fold-on-binding, conservation, and the
+# language-model features turn on when the matching extra is installed and its model is
+# available. Low complexity uses the NCBI SEG binary (segmasker) when it is on PATH.
 [project.optional-dependencies]
 predictors = [
     "metapredict>=3,<4",

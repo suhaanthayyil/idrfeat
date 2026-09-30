@@ -11,6 +11,7 @@ from idrfeat.annotations import (
     load_elm,
     load_phasepro,
 )
+from idrfeat.complexity import seg_masks, segmasker_available
 from idrfeat.features import Annotations, build_feature_table
 from idrfeat.io import load_config, read_fasta, write_table
 
@@ -39,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--proteome", default="UP000005640", help="UniProt proteome id")
     parser.add_argument("--out", default="data/processed/proteome_idr_features.parquet")
     parser.add_argument("--config")
-    parser.add_argument("--backend", choices=["metapredict", "aiupred", "heuristic"])
+    parser.add_argument("--backend", choices=["metapredict", "aiupred"])
     parser.add_argument("--limit", type=int, help="cap number of proteins for a smoke run")
     parser.add_argument("--elm", help="ELM instances TSV")
     parser.add_argument("--dbptm", nargs="+", help="one or more dbPTM files")
@@ -70,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         ptm=load_dbptm(args.dbptm) if args.dbptm else None,
         phasepro=load_phasepro(args.phasepro) if args.phasepro else None,
         drllps=load_drllps(args.drllps) if args.drllps else None,
+        lowcomplexity=seg_masks(seqs) if segmasker_available() else None,
     )
     df = build_feature_table(seqs, cfg, annotations=annotations)
     parquet_path, csv_path = write_table(df, args.out)

@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from idrfeat.cli import main
+from idrfeat.disorder import metapredict_available
 from idrfeat.features import TABLE_COLUMNS
 from idrfeat.io import example_fasta_path
+
+pytestmark = pytest.mark.skipif(
+    not metapredict_available(), reason="metapredict is required to call IDR segments"
+)
 
 
 def test_features_command_writes_table(tmp_path) -> None:
@@ -18,8 +24,6 @@ def test_features_command_writes_table(tmp_path) -> None:
             str(example_fasta_path()),
             "--out",
             str(out),
-            "--backend",
-            "heuristic",
         ]
     )
     assert rc == 0
@@ -28,4 +32,4 @@ def test_features_command_writes_table(tmp_path) -> None:
     df = pd.read_parquet(out)
     assert list(df.columns) == TABLE_COLUMNS
     assert len(df) >= 1
-    assert (df["disorder_backend"] == "heuristic").all()
+    assert (df["disorder_backend"] == "metapredict").all()

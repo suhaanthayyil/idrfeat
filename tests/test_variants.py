@@ -16,7 +16,7 @@ def test_apply_mutation_out_of_range() -> None:
 
 def test_segment_features_keys_present() -> None:
     f = segment_sequence_features("ASKGDESKGDESKGDE")
-    assert "net_charge" in f and "llps_seq_score" in f
+    assert "net_charge" in f and "omega" in f and "hydropathy_mean" in f
 
 
 def test_variant_delta_charge_shift() -> None:

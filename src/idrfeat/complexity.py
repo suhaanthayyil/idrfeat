@@ -1,68 +1,75 @@
-"""Sequence-complexity features: k-mer content, low-complexity fraction, and runs.
+"""Low-complexity and single-residue-run features.
 
-The full k-mer count vectors (400 for k=2, 8000 for k=3) are available from ``kmer_spectrum``
-for downstream use, but the per-segment table keeps only their richness and Shannon entropy so
-the table stays tidy. Low complexity is flagged with a sliding-window entropy rule rather than
-SEG so it needs no external tool and stays deterministic.
+Low complexity is called with SEG (Wootton and Federhen 1993) through the NCBI ``segmasker``
+binary, the field-standard low-complexity tool, rather than a local rule. ``seg_masks`` runs it
+once over a set of full sequences and returns a per-residue 0/1 mask per accession, so the
+per-segment low-complexity fraction is the mean of the mask over the segment. When ``segmasker``
+is not installed, low complexity is left unset (recorded as missing) rather than approximated.
+The longest single-residue run is an exact, tool-independent sequence statistic.
 """
 
 from __future__ import annotations
 
-import math
-from collections import Counter
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 
-LOWCOMPLEXITY_WINDOW = 12
-LOWCOMPLEXITY_ENTROPY_BITS = 2.0
+import numpy as np
 
 
-def kmer_spectrum(seq: str, k: int) -> dict[str, int]:
-    """Counts of every contiguous k-mer in ``seq``."""
-    if k <= 0 or len(seq) < k:
+def segmasker_available() -> bool:
+    return shutil.which("segmasker") is not None
+
+
+def _run_segmasker(fasta_path: str) -> str:
+    result = subprocess.run(
+        ["segmasker", "-in", fasta_path, "-outfmt", "interval"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout
+
+
+def _parse_intervals(output: str, lengths: dict[str, int]) -> dict[str, np.ndarray]:
+    masks = {acc: np.zeros(n, dtype=float) for acc, n in lengths.items()}
+    current: str | None = None
+    for line in output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(">"):
+            current = line[1:].split()[0]
+        elif current is not None and "-" in line:
+            a, b = (int(x) for x in line.split("-"))
+            mask = masks.get(current)
+            if mask is not None:
+                mask[a : b + 1] = 1.0
+    return masks
+
+
+def seg_masks(seqs: dict[str, str]) -> dict[str, np.ndarray]:
+    """Per-residue low-complexity mask (1 = low complexity) for each accession, via SEG."""
+    if not seqs:
         return {}
-    return dict(Counter(seq[i : i + k] for i in range(len(seq) - k + 1)))
+    with tempfile.TemporaryDirectory() as tmp:
+        fasta = Path(tmp) / "input.fasta"
+        with fasta.open("w") as fh:
+            for acc, seq in seqs.items():
+                fh.write(f">{acc}\n{seq}\n")
+        output = _run_segmasker(str(fasta))
+    return _parse_intervals(output, {acc: len(seq) for acc, seq in seqs.items()})
 
 
-def _shannon_bits(counts: list[int]) -> float:
-    total = sum(counts)
-    if total == 0:
+def seg_lowcomplexity_frac(seq: str) -> float:
+    """Fraction of a single sequence masked as low complexity by SEG, or NaN if SEG is absent."""
+    if not seq:
         return 0.0
-    h = 0.0
-    for c in counts:
-        if c:
-            p = c / total
-            h -= p * math.log2(p)
-    return h
-
-
-def kmer_features(seq: str, ks: tuple[int, ...] = (1, 2, 3)) -> dict[str, float]:
-    """Distinct count, Shannon entropy (bits), and normalized diversity per k."""
-    feats: dict[str, float] = {}
-    for k in ks:
-        spectrum = kmer_spectrum(seq, k)
-        windows = len(seq) - k + 1 if len(seq) >= k else 0
-        distinct = len(spectrum)
-        feats[f"kmer{k}_distinct"] = distinct
-        feats[f"kmer{k}_entropy"] = _shannon_bits(list(spectrum.values()))
-        feats[f"kmer{k}_diversity"] = distinct / windows if windows else 0.0
-    return feats
-
-
-def lowcomplexity_frac(
-    seq: str,
-    window: int = LOWCOMPLEXITY_WINDOW,
-    entropy_bits: float = LOWCOMPLEXITY_ENTROPY_BITS,
-) -> float:
-    """Fraction of residues covered by a window whose residue entropy is below threshold."""
-    n = len(seq)
-    if n == 0:
-        return 0.0
-    w = min(window, n)
-    flagged = [False] * n
-    for i in range(n - w + 1):
-        if _shannon_bits(list(Counter(seq[i : i + w]).values())) < entropy_bits:
-            for j in range(i, i + w):
-                flagged[j] = True
-    return sum(flagged) / n
+    if not segmasker_available():
+        return float("nan")
+    mask = seg_masks({"seq": seq}).get("seq")
+    return float(mask.mean()) if mask is not None and mask.size else 0.0
 
 
 def longest_single_run(seq: str) -> int:

@@ -65,6 +65,7 @@ def test_charge_features_match_localcider() -> None:
         sp = SequenceParameters(standardize_sequence(s))
         feats = charge_features(s)
         assert math.isclose(feats["kappa"], sp.get_kappa(), abs_tol=1e-6)
+        assert math.isclose(feats["omega"], sp.get_Omega(), abs_tol=1e-6)
         assert math.isclose(feats["scd"], sp.get_SCD(), abs_tol=1e-6)
         assert math.isclose(feats["fcr"], sp.get_FCR(), abs_tol=1e-6)
         assert math.isclose(feats["ncpr"], sp.get_NCPR(), abs_tol=1e-6)

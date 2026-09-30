@@ -1,14 +1,10 @@
-"""Tests for amino acid composition and hydropathy features."""
+"""Tests for composition and hydropathy features, all sourced from localCIDER."""
 
 from __future__ import annotations
 
 import math
 
-from idrfeat.composition import (
-    composition_features,
-    hydropathy_patterning,
-    mean_hydropathy,
-)
+from idrfeat.composition import composition_features, mean_hydropathy
 
 
 def test_aa_fractions_sum_to_one() -> None:
@@ -34,32 +30,34 @@ def test_grouped_fractions() -> None:
 
 
 def test_disorder_promoting_fraction() -> None:
-    # Disorder-promoting set is A R G Q S E K P. "ARGQSEKP" is all of them.
-    feats = composition_features("ARGQSEKP")
-    assert math.isclose(feats["frac_disorder_promoting"], 1.0)
-    # I L V F W Y C M are not disorder-promoting.
-    feats2 = composition_features("ILVFWYCM")
-    assert math.isclose(feats2["frac_disorder_promoting"], 0.0)
+    assert math.isclose(composition_features("ARGQSEKP")["frac_disorder_promoting"], 1.0)
+    assert math.isclose(composition_features("ILVFWYCM")["frac_disorder_promoting"], 0.0)
 
 
-def test_mean_hydropathy_normalized_range() -> None:
-    # Isoleucine is the most hydrophobic Kyte-Doolittle residue (raw 4.5 -> 1.0).
-    assert math.isclose(mean_hydropathy("I"), 1.0, abs_tol=1e-9)
-    # Arginine is the most hydrophilic (raw -4.5 -> 0.0).
+def test_mean_hydropathy_localcider_scale() -> None:
+    # localCIDER normalized Kyte-Doolittle scale, 0 to 9. Isoleucine is most hydrophobic (9),
+    # arginine most hydrophilic (0).
+    assert math.isclose(mean_hydropathy("I"), 9.0, abs_tol=1e-9)
     assert math.isclose(mean_hydropathy("R"), 0.0, abs_tol=1e-9)
-    mixed = mean_hydropathy("IR")
-    assert 0.0 < mixed < 1.0
+    assert 0.0 < mean_hydropathy("IR") < 9.0
 
 
-def test_hydropathy_patterning_blocky_vs_mixed() -> None:
-    # Following the SCD convention, blocky hydropathy segregation is more negative than the
-    # same residues evenly interspersed.
-    clustered = hydropathy_patterning("IIIIISSSSS")
-    alternating = hydropathy_patterning("ISISISISIS")
-    assert clustered < alternating
-    # A uniform-hydropathy sequence has no patterning.
-    assert math.isclose(hydropathy_patterning("AAAAA"), 0.0, abs_tol=1e-9)
-    assert hydropathy_patterning("") == 0.0
+def test_matches_localcider() -> None:
+    import pytest
+
+    pytest.importorskip("localcider")
+    from localcider.sequenceParameters import SequenceParameters
+
+    from idrfeat.disorder import standardize_sequence
+
+    for s in ["DEKRFWYPG", "ARGQSEKP", "MSKGEEDNMAIIKEFMRFKVHMEGSVNGHEF"]:
+        sp = SequenceParameters(standardize_sequence(s))
+        feats = composition_features(s)
+        assert math.isclose(feats["frac_charged"], sp.get_FCR(), abs_tol=1e-9)
+        assert math.isclose(
+            feats["frac_disorder_promoting"], sp.get_fraction_disorder_promoting(), abs_tol=1e-9
+        )
+        assert math.isclose(mean_hydropathy(s), sp.get_mean_hydropathy(), abs_tol=1e-9)
 
 
 def test_empty_sequence_is_safe() -> None:

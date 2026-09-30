@@ -1,10 +1,10 @@
 """Assemble one feature row per IDR segment into a tidy table.
 
 The column set is fixed and documented in ``docs/features.md``; ``TABLE_COLUMNS`` is the single
-source of truth for both the output order and the docs. Sequence-based features are always
-populated. Predictor and annotation features are filled with missing values when their model or
-database is not supplied, so the table records what was actually computed rather than implying a
-zero where the source was simply absent.
+source of truth for both the output order and the docs. Sequence-based physicochemical features
+come from localCIDER. Predictor, low-complexity, and annotation features are filled with missing
+values when their model, binary, or database is not supplied, so the table records what was
+actually computed rather than implying a zero where the source was simply absent.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from .annotations import (
     ptm_segment_features,
 )
 from .charge import charge_features
-from .complexity import kmer_features, longest_single_run, lowcomplexity_frac
-from .composition import composition_features, hydropathy_patterning, mean_hydropathy
+from .complexity import longest_single_run
+from .composition import composition_features, mean_hydropathy
 from .constants import AA
 from .disorder import (
     aiupred_available,
@@ -35,7 +35,6 @@ from .disorder import (
     primary_disorder,
     segments_from_scores,
 )
-from .phasesep import charge_aromatic_proxy, llps_seq_score
 
 ID_COLUMNS = [
     "accession",
@@ -52,21 +51,9 @@ _COMPOSITION_COLUMNS = (
     + ["frac_charged", "frac_polar", "frac_aromatic", "frac_proline", "frac_glycine"]
     + ["frac_disorder_promoting"]
 )
-_CHARGE_COLUMNS = ["fcr", "ncpr", "net_charge", "kappa", "scd", "frac_positive", "frac_negative"]
-_HYDROPATHY_COLUMNS = ["hydropathy_mean", "hydropathy_patterning"]
-_COMPLEXITY_COLUMNS = [
-    "kmer1_distinct",
-    "kmer1_entropy",
-    "kmer1_diversity",
-    "kmer2_distinct",
-    "kmer2_entropy",
-    "kmer2_diversity",
-    "kmer3_distinct",
-    "kmer3_entropy",
-    "kmer3_diversity",
-    "lowcomplexity_frac",
-    "longest_single_run",
-]
+_CHARGE_COLUMNS = ["fcr", "ncpr", "net_charge", "kappa", "omega", "scd", "frac_positive", "frac_negative"]
+_HYDROPATHY_COLUMNS = ["hydropathy_mean"]
+_COMPLEXITY_COLUMNS = ["lowcomplexity_frac", "longest_single_run"]
 _DISORDER_COLUMNS = [
     "disorder_mean",
     "disorder_max",
@@ -87,7 +74,7 @@ _MOTIF_COLUMNS = [
 _PTM_COLUMNS = ["ptm_count", "ptm_density"] + [
     f"ptm_{b}_{stat}" for b in PTM_BUCKETS for stat in ("count", "density")
 ]
-_PHASESEP_COLUMNS = ["phasepro_overlap", "drllps_member", "llps_seq_score", "charge_aromatic_proxy"]
+_PHASESEP_COLUMNS = ["phasepro_overlap", "drllps_member"]
 _CONSERVATION_COLUMNS = ["phylop_mean", "phastcons_mean"]
 
 FEATURE_COLUMNS = (
@@ -116,6 +103,7 @@ class Annotations:
     plddt: dict | None = None  # accession -> per-residue pLDDT array
     phylop: dict | None = None  # accession -> per-residue phyloP array
     phastcons: dict | None = None  # accession -> per-residue phastCons array
+    lowcomplexity: dict | None = None  # accession -> per-residue SEG low-complexity mask
 
 
 def _segment_stats(scores: np.ndarray | None, start: int, end: int, threshold: float):
@@ -135,10 +123,14 @@ def _segment_mean(values: np.ndarray | None, start: int, end: int) -> float:
 
 
 def _resolve_primary(cfg: dict) -> str:
-    requested = cfg["disorder"].get("primary", "metapredict")
-    if requested == "metapredict" and not metapredict_available():
-        return "heuristic"
-    return requested
+    backend = cfg["disorder"].get("primary", "metapredict")
+    if backend == "metapredict" and not metapredict_available():
+        raise RuntimeError(
+            "metapredict is required to call IDR segments; install the 'predictors' extra"
+        )
+    if backend == "aiupred" and not aiupred_available():
+        raise RuntimeError("aiupred backend requested but aiupred is not installed")
+    return backend
 
 
 def _segment_row(
@@ -159,8 +151,6 @@ def _segment_row(
     seg_len = len(seg)
     threshold = cfg["disorder"]["score_threshold"]
     binding_threshold = cfg["disorder"]["binding_threshold"]
-    lc_cfg = cfg["lowcomplexity"]
-    ks = tuple(cfg["kmer"]["ks"])
 
     row: dict = {
         "accession": acc,
@@ -174,10 +164,8 @@ def _segment_row(
     row.update(composition_features(seg))
     row.update(charge_features(seg))
     row["hydropathy_mean"] = mean_hydropathy(seg)
-    row["hydropathy_patterning"] = hydropathy_patterning(seg)
-    row.update(kmer_features(seg, ks=ks))
-    row["lowcomplexity_frac"] = lowcomplexity_frac(
-        seg, window=lc_cfg["window"], entropy_bits=lc_cfg["entropy_bits"]
+    row["lowcomplexity_frac"] = _segment_mean(
+        anns.lowcomplexity.get(acc) if anns.lowcomplexity else None, start, end
     )
     row["longest_single_run"] = longest_single_run(seg)
 
@@ -207,8 +195,6 @@ def _segment_row(
         phasepro_overlap(acc, start, end, anns.phasepro) if anns.phasepro is not None else np.nan
     )
     row["drllps_member"] = drllps_member(acc, anns.drllps) if anns.drllps is not None else np.nan
-    row["llps_seq_score"] = llps_seq_score(seg)
-    row["charge_aromatic_proxy"] = charge_aromatic_proxy(seg)
 
     row["phylop_mean"] = _segment_mean(anns.phylop.get(acc) if anns.phylop else None, start, end)
     row["phastcons_mean"] = _segment_mean(
